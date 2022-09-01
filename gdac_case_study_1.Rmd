@@ -1,0 +1,306 @@
+---
+title: "Google Data Analytics - Case Study 1"
+output: html_document
+author: Jos Ignacio
+date: '2022-08-31'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+***
+
+## Case Study 1: How Does a Bike-Share Navigate Speedy Success?
+
+***
+
+### Introduction
+
+Cyclistic is a bike-share program that features more than 5,800 bicycles and 600 docking stations. To avail
+its program, customers can avail single-ride passes, full-day passes, and annual memberships. Customers who 
+purchase single-ride or full-day passes are referred to as casual riders. Customers who purchase annual 
+memberships are Cyclistic members.
+
+***
+
+### Business Task
+
+Cyclistic’s finance analysts have concluded that annual members are much more profitable than casual riders.
+In order to convert casual riders into members, the marketing analyst team aims to design marketing strategies. 
+The team must understand the difference between casual and member riders by analyzing Cyclistic historical 
+bike trip data to identify trends. 
+
+***
+
+### Preparing Data
+
+Data to be used came from the module of the course and can be accessed [here](https://divvy-tripdata.s3.amazonaws.com/index.html).
+The data being used are from August 2021 to July 2022.
+
+* Installing Required Packages
+```{r}
+library(tidyverse)
+library(lubridate)
+library(ggplot2)
+library(readxl)
+library('scales')
+```
+
+* Importing Files
+  + Setting Directories
+  + Importing Files frrom August 2021 to July 2022
+```{r}
+setwd("F:/Code/Google Data Analytics/Case Study 1/202108-202207-tripdata-xlsx")
+td_202108 <- read_excel("202108-divvy-tripdata.xlsx")
+td_202109 <- read_excel("202109-divvy-tripdata.xlsx")
+td_202110 <- read_excel("202110-divvy-tripdata.xlsx")
+td_202111 <- read_excel("202111-divvy-tripdata.xlsx")
+td_202112 <- read_excel("202112-divvy-tripdata.xlsx")
+td_202112 <- read_excel("202112-divvy-tripdata.xlsx")
+td_202201 <- read_excel("202201-divvy-tripdata.xlsx")
+td_202202 <- read_excel("202202-divvy-tripdata.xlsx")
+td_202203 <- read_excel("202203-divvy-tripdata.xlsx")
+td_202204 <- read_excel("202204-divvy-tripdata.xlsx")
+td_202205 <- read_excel("202205-divvy-tripdata.xlsx")
+td_202206 <- read_excel("202206-divvy-tripdata.xlsx")
+td_202207 <- read_excel("202207-divvy-tripdata.xlsx")
+```
+***
+### Manipulating Data
+
+* Merging All Files
+```{r}
+all_trips <- bind_rows(td_202108, td_202109, td_202110, td_202111, td_202112, td_202201, td_202202, td_202203, td_202204, td_202205, td_202206, td_202207)
+head(all_trips)
+```
+
+* Add Columns for Analysis
+  + Ride Length
+```{r}
+all_trips$ride_length <- difftime(all_trips$ended_at,all_trips$started_at)
+all_trips$ride_length <- as.numeric(as.character(all_trips$ride_length))
+```
+  + Days of the Week
+```{r}
+all_trips$day_of_week <- format(as.Date(all_trips$started_at), "%A")
+all_trips$day_of_week <- ordered(all_trips$day_of_week, levels=c("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"))
+```
+  + Month
+```{r}
+all_trips <- all_trips %>% 
+       mutate(year_month = strftime(all_trips$started_at, "%b"))
+```
+  + Start Hour
+```{r}
+all_trips <- all_trips %>% 
+            mutate(start_hour = format(as_datetime(all_trips$ended_at), "%H"))
+head(all_trips)
+```
+
+***
+### Cleaning Data
+
+* Deleting Negative Ride Lengths
+```{r}
+all_trips_v2 <- all_trips[! (all_trips$ride_length<0),]
+```
+* Removing Duplicates
+```{r}
+all_trips_v2 <- all_trips_v2[!duplicated(all_trips_v2$ride_id),]
+```
+* Remove Irrelevant Columns
+```{r}
+all_trips_v2 <- all_trips_v2 %>%  
+   select(-c(start_lat, start_lng, end_lat, end_lng, start_station_id, start_station_name, end_station_name, end_station_id))
+head(all_trips_v2)
+```
+
+***
+
+### Analyzing Data
+
+***
+
+1. Comparing Number of Casual vs Member Riders
+
+```{r}
+fig <- function(width, heigth){options(repr.plot.width = width, repr.plot.height = heigth)}
+
+fig(16,8)
+ggplot(all_trips_v2, aes(member_casual, fill=member_casual)) +
+  geom_bar() +
+  labs(title="Figure 1: Rider Classification Distribution", x = 'Rider Classification', y = 'Number of Riders') +
+  scale_y_continuous(labels = comma) +
+  theme(legend.position = 'none')
+```
+
+There are more riders who availed membership than those who did not.
+
+***
+
+2. Observing Average Duration and Number of Rides of Casual and Member Riders based on Day
+
+Getting the number of rides and average duration per day
+```{r}
+sum_day_of_week <- all_trips_v2 %>% 
+      group_by(member_casual, day_of_week) %>%
+      summarise(number_of_rides = n(), average_duration = mean(ride_length)) %>% 
+      arrange(member_casual, day_of_week)
+```
+
+```{r}
+fig(16,8)
+ggplot(sum_day_of_week, aes(x = day_of_week, y = number_of_rides, fill=member_casual)) +
+  geom_col(position = 'dodge') +
+  labs(title="Figure 2: Number of Rides by Rider Classification according to Day", x = 'Day of Week', y = 'Number of Riders') +
+  scale_y_continuous(labels = comma) +
+  guides(fill = guide_legend(title = 'Rider Classification'))
+```
+
+There are more casual riders on weekends.
+
+***
+
+```{r}
+fig(16,8)
+ggplot(sum_day_of_week, aes(x = day_of_week, y = average_duration, fill=member_casual)) +
+  geom_col(position = 'dodge') +
+  labs(title="Figure 3: Average Duration by Rider Classification according to Day", x = 'Day of Week', y = 'Average Duration') +
+  scale_y_continuous(labels = comma) +
+  guides(fill = guide_legend(title = 'Rider Classification'))
+```
+
+Casual Riders spend more time riding especially on weekends than member riders.
+
+***
+
+3. Observing Average Duration and Number of Rides of Casual and Member Riders based on the Hour of the Day
+
+Getting the number of rides and average duration per hour of the day
+```{r}
+sum_start_hour <- all_trips_v2 %>% 
+       group_by(member_casual, start_hour) %>%
+     summarise(number_of_rides = n(), average_duration = mean(ride_length)) %>% 
+        arrange(member_casual, start_hour)
+```
+
+```{r}
+fig(16,8)
+ggplot(sum_start_hour, aes(x = start_hour, y = number_of_rides, fill=member_casual)) +
+  geom_col(position = 'dodge') +
+  labs(title="Figure 4: Number of Rides by Rider Classification according to the Hour of the Day", x = 'Starting Hour', y = 'Number of Riders') +
+  scale_y_continuous(labels = comma) +
+  guides(fill = guide_legend(title = 'Rider Classification'))
+```
+
+***
+
+Majority of casual riders ride during the afternoon. Member riders ride from morning until the afternoon.
+
+```{r}
+fig(16,8)
+ggplot(sum_start_hour, aes(x = start_hour, y = average_duration, fill=member_casual)) +
+  geom_col(position = 'dodge') +
+  labs(title="Figure 5: Average Duration by Rider Classification according to the Hour of the Day", x = 'Starting Hour', y = 'Average Duration') +
+  scale_y_continuous(labels = comma) +
+  guides(fill = guide_legend(title = 'Rider Classification'))
+```
+
+Casual riders spend more time riding than member riders.
+
+***
+
+4. Observing Average Duration and Number of Rides of Casual and Member Riders based on Month
+
+Getting the number of rides and average duration per month
+```{r}
+sum_year_month <- all_trips_v2 %>% 
+      mutate(year_month = factor(year_month, levels = c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"))) %>% 
+       group_by(member_casual, year_month) %>%
+       summarise(number_of_rides = n(), average_duration = mean(ride_length)) %>% 
+       arrange(member_casual, year_month)
+```
+
+```{r}
+fig(16,8)
+ggplot(sum_year_month, aes(x = year_month, y = number_of_rides, fill=member_casual)) +
+  geom_col(position = 'dodge') +
+  labs(title="Figure 6: Number of Rides by Rider Classification according to the Month", x = 'Month', y = 'Number of Riders') +
+  scale_y_continuous(labels = comma) +
+  guides(fill = guide_legend(title = 'Rider Classification'))
+```
+
+Number of Riders peak from June to September. There are less riders from November to April. 
+
+***
+
+```{r}
+fig(16,8)
+ggplot(sum_year_month, aes(x = year_month, y = average_duration, fill=member_casual)) +
+  geom_col(position = 'dodge') +
+  labs(title="Figure 7: Average Duration by Rider Classification according to Month", x = 'Month', y = 'Average Duration') +
+  scale_y_continuous(labels = comma) +
+  guides(fill = guide_legend(title = 'Rider Classification'))
+```
+
+Casual riders spend more time riding than member riders.
+
+***
+
+5. Observing Average Duration and Number of Rides of Casual and Member Riders based on Rideable Type
+
+Getting the number of rides and average duration per rideable type
+```{r}
+sum_rideable_type <- all_trips_v2 %>% 
+       group_by(member_casual, rideable_type) %>% 
+       summarise(number_of_rides = n(), average_duration = mean(ride_length)) %>% 
+       arrange(member_casual, rideable_type)
+```
+
+```{r}
+fig(16,8)
+ggplot(sum_rideable_type, aes(x = rideable_type, y = number_of_rides, fill=member_casual)) +
+  geom_col(position = 'dodge') +
+  labs(title="Figure 6: Number of Rides by Rider Classification according to the Month", x = 'Rideable Type', y = 'Number of Riders') +
+  scale_y_continuous(labels = comma) +
+  guides(fill = guide_legend(title = 'Rider Classification'))
+```
+
+Casual riders has an almost equal amount of riders using a classic bike and an electric bike. Casual riders also use docked bikes. Member riders use the classic bike more often.
+
+***
+
+```{r}
+fig(16,8)
+ggplot(sum_rideable_type, aes(x = rideable_type, y = average_duration, fill=member_casual)) +
+  geom_col(position = 'dodge') +
+  labs(title="Figure 7: Average Duration by Rider Classification according to Rideable Type", x = 'Rideable Type', y = 'Average Duration') +
+  scale_y_continuous(labels = comma) +
+  guides(fill = guide_legend(title = 'Rider Classification'))
+```
+
+Casual riders spend more time riding than member riders in both bike types. More time is spent on using a docked bike.
+
+***
+
+### Summary
+
+Casual Riders and Member Riders differ according to the following:
+1. There are more Member Riders than Casual Riders.
+2. Casual Riders spend more time riding than member riders.
+3. Casual Riders ride more during weekends and afternoons.
+4. Casual Riders use docked bikes.
+5. Member Riders use classic bikes more often.
+6. Member Riders use the bikes throughout the week and mostly from morning until afternoon.
+7. Number of Riders peak during the months of June to October.
+
+***
+
+### Recommendations
+
+To increase casual rider to member rider conversion, the recommendations are the following:
+1. Have a ride length limit for casual riders. 
+2. Promote benefits of biking during the morning and weekdays.
+3. Have membership discounts during peak seasons. 
+
+
